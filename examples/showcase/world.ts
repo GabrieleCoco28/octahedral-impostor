@@ -1,6 +1,6 @@
 import { createRadixSort, InstancedMesh2 } from '@three.ez/instanced-mesh';
 import { Asset, Main, PerspectiveCameraAuto } from '@three.ez/main';
-import { AmbientLight, Color, DirectionalLight, FogExp2, FrontSide, Material, Mesh, MeshLambertMaterial, MeshStandardMaterial, RepeatWrapping, Scene, Texture, TextureLoader } from 'three';
+import { AmbientLight, Color, DirectionalLight, FogExp2, FrontSide, Material, Mesh, MeshLambertMaterial, MeshStandardMaterial, RepeatWrapping, Scene, Texture, TextureLoader, Vector3 } from 'three';
 import 'three-hex-tiling';
 import { GLTF, GLTFLoader, MapControls } from 'three/examples/jsm/Addons.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -52,13 +52,16 @@ Asset.load<GLTF>(GLTFLoader, 'tree.glb').then(async (gltf) => {
     lacunarity: 3,
     gain: 0.2
   };
+  const visibilityTreeRange = { min: -0.5, max: 0.1 };
 
   const terrain = new Terrain(new MeshStandardMaterial({ color: 0xdddddd, map: grassMap, normalMap: grassNormalMap, hexTiling: {} }), options);
   terrain.receiveShadow = true;
 
+  const pos: Vector3[] = [];
   for (let x = -(options.maxChunksX / 2); x < (options.maxChunksX / 2); x++) {
     for (let z = -(options.maxChunksZ / 2); z < (options.maxChunksZ / 2); z++) {
       await terrain.addChunk(x, z);
+      pos.push(...(await terrain.generateTreesPerChunk(x, z, 1000))); // imporve it
     }
   }
   scene.add(terrain);
@@ -71,8 +74,6 @@ Asset.load<GLTF>(GLTFLoader, 'tree.glb').then(async (gltf) => {
   const mergedGeo = mergeGeometries(mesh.children.map((x) => (x as Mesh).geometry), true);
   const materials = mesh.children.map((x) => (x as Mesh).material as Material);
 
-  const pos = await terrain.generateTrees(100000); // imporve it
-
   const iMesh = new InstancedMesh2(mergedGeo, materials, { createEntities: true, renderer: main.renderer, capacity: pos.length });
 
   // iMesh.sortObjects = true;
@@ -84,7 +85,9 @@ Asset.load<GLTF>(GLTFLoader, 'tree.glb').then(async (gltf) => {
     obj.position.copy(pos[index]);
     obj.rotateY(Math.random() * Math.PI * 2).rotateX(Math.random() * 0.5 - 0.25);
     obj.scale.setScalar(Math.random() * 0.5 + 0.75);
-    // obj.color.setHSL(Math.random(), 0.5, 0.5);
+    const noiseVal = obj.position.y;
+    if (noiseVal < visibilityTreeRange.min * terrain.amplitude || noiseVal > visibilityTreeRange.max * terrain.amplitude)
+      obj.visible = false;
   });
 
   const impostor = new OctahedralImpostor({

@@ -25,16 +25,16 @@ const LODCount = 4;
 
 export class Terrain<M extends Material> extends BatchedMesh {
   declare material: M;
-  protected chunkSize: number;
-  protected maxChunksX: number;
-  protected maxChunksZ: number;
-  protected segments: number;
-  protected frequency: number;
-  protected amplitude: number;
-  protected octaves: number;
-  protected lacunarity: number;
-  protected gain: number;
-  protected noiseCallback: (x: number, y: number) => number;
+  public readonly chunkSize: number;
+  public readonly maxChunksX: number;
+  public readonly maxChunksZ: number;
+  public readonly segments: number;
+  public readonly frequency: number;
+  public readonly amplitude: number;
+  public readonly octaves: number;
+  public readonly lacunarity: number;
+  public readonly gain: number;
+  public readonly noiseCallback: (x: number, y: number) => number;
 
   constructor(material: M, options: TerrainParams) {
     const { maxChunksX, maxChunksZ, segments } = options;
@@ -123,33 +123,36 @@ export class Terrain<M extends Material> extends BatchedMesh {
   }
 
   // move
-  public async generateTrees(count: number): Promise<Vector3[]> {
-    const octaves = this.octaves;
+  public async generateTreesPerChunk(x: number, z: number, count: number): Promise<Vector3[]> {
     const chunkSize = this.chunkSize;
-    const halfMaxChunksX = Math.trunc(this.maxChunksX / 2);
-    const halfMaxChunksZ = Math.trunc(this.maxChunksZ / 2);
+    const halfChunkSize = chunkSize / 2;
 
     const positions: Vector3[] = [];
-
     for (let i = 0; i < count; i++) {
-      const x = this.randomRange(-halfMaxChunksX - 0.5, halfMaxChunksX - 0.5);
-      const z = this.randomRange(-halfMaxChunksZ - 0.5, halfMaxChunksZ - 0.5);
+      const xVal = this.randomRange(x * chunkSize - halfChunkSize, (x * chunkSize) + halfChunkSize);
+      const zVal = this.randomRange(z * chunkSize - halfChunkSize, (z * chunkSize) + halfChunkSize);
 
-      let amplitude = this.amplitude;
-      let frequency = this.frequency;
-      let noiseVal = 0;
+      const noiseVal = this.generatePosition(xVal, zVal);
 
-      for (let o = 0; o < octaves; o++) {
-        noiseVal += this.noiseCallback(x * chunkSize * frequency, z * chunkSize * frequency) * amplitude;
-        amplitude *= this.gain;
-        frequency *= this.lacunarity;
-      }
-      if (noiseVal > -0.5 * this.amplitude && noiseVal < 0.5 * this.amplitude) {
-        positions.push(new Vector3(x * chunkSize, noiseVal, z * chunkSize));
-      }
+      positions.push(new Vector3(xVal, noiseVal, zVal));
     }
 
     return positions;
+  }
+
+  public generatePosition(x: number, z: number): number {
+    const octaves = this.octaves;
+    let amplitude = this.amplitude;
+    let frequency = this.frequency;
+    let noiseVal = 0;
+
+    for (let o = 0; o < octaves; o++) {
+      noiseVal += this.noiseCallback(x * frequency, z * frequency) * amplitude;
+      amplitude *= this.gain;
+      frequency *= this.lacunarity;
+    }
+
+    return noiseVal;
   }
 
   public randomRange(min: number, max: number): number {
