@@ -1,20 +1,29 @@
 import { createRadixSort, InstancedMesh2 } from '@three.ez/instanced-mesh';
 import { Asset, Main, PerspectiveCameraAuto } from '@three.ez/main';
-import { AmbientLight, Color, DirectionalLight, FogExp2, FrontSide, Material, Mesh, MeshLambertMaterial, MeshStandardMaterial, RepeatWrapping, Scene, Texture, TextureLoader, Vector3 } from 'three';
+import { AmbientLight, Color, DirectionalLight, EquirectangularReflectionMapping, FloatType, FogExp2, FrontSide, Material, Mesh, MeshLambertMaterial, MeshStandardMaterial, RepeatWrapping, Scene, Texture, TextureLoader, Vector3 } from 'three';
 import 'three-hex-tiling';
 import { GLTF, GLTFLoader, MapControls } from 'three/examples/jsm/Addons.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { OctahedralImpostor } from '../../src/core/octahedralImpostor.js';
 import { Terrain, TerrainParams } from './terrain.js';
+import { UltraHDRLoader } from 'three/addons/loaders/UltraHDRLoader.js';
 
 // TODO: render terrain first to avoid impostor overdraw
 
 const camera = new PerspectiveCameraAuto(50, 0.1, 5000).translateZ(20).translateY(5);
 const scene = new Scene();
-const main = new Main(); // init renderer and other stuff
+const main = new Main({showStats: false}); // init renderer and other stuff
 const controls = new MapControls(camera, main.renderer.domElement);
 controls.maxPolarAngle = Math.PI / 2;
 controls.update();
+
+const loader = new UltraHDRLoader();
+loader.type = FloatType;
+loader.load(`skybox2.jpg`, function (texture) {
+  texture.mapping = EquirectangularReflectionMapping;
+  scene.background = texture;
+  // scene.environment = texture;
+});
 
 main.renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio)); // TODO mmm...
 
@@ -25,8 +34,6 @@ Asset.load<GLTF>(GLTFLoader, 'tree.glb').then(async (gltf) => {
   const ambientLight = new AmbientLight('white', 1);
 
   scene.add(directionalLight, ambientLight);
-
-  scene.background = new Color('cyan');
   scene.fog = new FogExp2('cyan', 0.0005);
 
   main.createView({ scene, camera, enabled: false });
